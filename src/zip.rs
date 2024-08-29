@@ -21,7 +21,9 @@ pub fn pack<P: AsRef<Path>>(srcpath: P) -> Result<Vec<u8>> {
             &mut it.filter_map(|e| e.ok()),
             srcpath,
             file,
-            zip::CompressionMethod::Zstd,
+            // use algorithm deflate when create zip package since it is compatibility with almost
+            // OSs, see: https://superuser.com/questions/894859/what-zip-compression-method-do-common-oss-natively-support
+            zip::CompressionMethod::Deflated,
         )?;
         let mut f = File::open(dstpath)?;
         f.read_to_end(&mut content)?;
@@ -91,4 +93,3 @@ where
     zip.finish()?;
     Ok(())
 }
-
