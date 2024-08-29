@@ -4,7 +4,7 @@ use std::{
     path::Path,
 };
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 
 use crate::Result;
 
@@ -75,14 +75,19 @@ where
     let mut buffer = Vec::new();
     for entry in it {
         let path = entry.path();
+        // zip always requires slash (/) as path separator
         let name = path
             .strip_prefix(prefix)?
+            .components()
+            .map(|x| x.as_os_str())
+            .collect::<Vec<_>>()
+            .join(std::ffi::OsStr::new("/"))
             .to_str()
-            .ok_or(anyhow!("strip prefix {} failed", prefix.display()))?;
+            .context("normalize path in UTF-8 format")?
+            .to_string();
         if path.is_file() {
             zip.start_file(name, options)?;
             let mut f = File::open(path)?;
-
             f.read_to_end(&mut buffer)?;
             zip.write_all(&buffer)?;
             buffer.clear();
