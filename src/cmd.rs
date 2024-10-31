@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     env::current_dir,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
 };
 
 use anyhow::{anyhow, Context};
@@ -35,19 +35,7 @@ pub struct Cmd {
 
 impl Cmd {
     pub fn output_in_bytes(&self) -> Result<(Vec<u8>, Vec<u8>)> {
-        let Some(prog) = self.argv.first() else {
-            return Err(anyhow!("command is empty"));
-        };
-        let mut proc = Command::new(prog);
-        if self.argv.len() > 1 {
-            proc.args(&self.argv[1..]);
-        }
-        if self.stream {
-            proc.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-        }
-        proc.current_dir(self.cwd.as_path());
-        proc.envs(&self.envs);
-
+        let mut proc = self.process()?;
         let outbuf =
             proc.output().context(format!("spawn command: {proc:?}"))?;
         if !outbuf.status.success() {
@@ -83,6 +71,27 @@ impl Cmd {
     pub fn run(&self) -> Result<()> {
         self.output(true)?;
         Ok(())
+    }
+
+    pub fn spawn(&self) -> Result<Child> {
+        let mut proc = self.process()?;
+        Ok(proc.spawn()?)
+    }
+
+    pub fn process(&self) -> Result<Command> {
+        let Some(prog) = self.argv.first() else {
+            return Err(anyhow!("command is empty"));
+        };
+        let mut proc = Command::new(prog);
+        if self.argv.len() > 1 {
+            proc.args(&self.argv[1..]);
+        }
+        if self.stream {
+            proc.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+        }
+        proc.current_dir(self.cwd.as_path());
+        proc.envs(&self.envs);
+        Ok(proc)
     }
 }
 
@@ -130,5 +139,9 @@ impl CmdBuilder {
 
     pub fn build(self) -> Cmd {
         self.cmd
+    }
+
+    pub fn get_argv(&self) -> Vec<String> {
+        self.cmd.argv.clone()
     }
 }
