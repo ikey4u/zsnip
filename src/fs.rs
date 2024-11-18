@@ -104,6 +104,7 @@ pub struct Copier {
     dst: PathBuf,
     includes: Vec<String>,
     excludes: Vec<String>,
+    follow_links: bool,
 }
 
 impl Copier {
@@ -113,13 +114,16 @@ impl Copier {
             1 => !self.src[0].is_file(),
             _ => true,
         };
-        if should_create_dst {
+        if should_create_dst && !self.dst.exists() {
             mkdir(&[self.dst.as_path()])?;
         }
         for src in self.src.iter() {
             let src_ref = src.as_path();
+            ensure!(src_ref.exists(), "{} does not exist", src_ref.display());
             let dst_ref = self.dst.as_path();
+
             walkdir::WalkDir::new(src_ref)
+                .follow_links(self.follow_links)
                 .into_iter()
                 .par_bridge()
                 .flatten()
@@ -136,9 +140,16 @@ impl Copier {
                         return Ok(());
                     }
 
-                    let relatvie_path = source_file.strip_prefix(src_ref)?;
-
-                    let dest_file = dst_ref.join(relatvie_path);
+                    let dest_file = if src_ref == source_file {
+                        dst_ref.join(source_file.file_name().context(
+                            format!(
+                                "get file name of {}",
+                                source_file.display()
+                            ),
+                        )?)
+                    } else {
+                        dst_ref.join(source_file.strip_prefix(src_ref)?)
+                    };
                     let dest_file_dir = dest_file.parent().context(format!(
                         "failed to get parent directory from {}",
                         dest_file.display()
@@ -155,7 +166,7 @@ impl Copier {
                     std::fs::copy(source_file, &dest_file).context(format!(
                         "failed to copy {} to {}",
                         source_file.display(),
-                        dest_file.display()
+                        dest_file.display(),
                     ))?;
 
                     Ok(())
@@ -167,24 +178,54 @@ impl Copier {
 }
 
 pub struct CopierBuilder {
+    cwd: Option<PathBuf>,
     copier: Copier,
 }
 
 impl CopierBuilder {
     pub fn new<P: AsRef<Path>>(dst: P) -> Self {
         CopierBuilder {
+            cwd: None,
             copier: Copier {
                 src: vec![],
                 dst: dst.as_ref().to_path_buf(),
                 includes: vec![],
                 excludes: vec![],
+                follow_links: false,
             },
         }
     }
 
-    pub fn add<P: AsRef<Path>>(mut self, src: P) -> Self {
-        self.copier.src.push(src.as_ref().to_path_buf());
+    pub fn cwd<P: AsRef<Path>>(mut self, cwd: P) -> Self {
+        self.cwd = Some(cwd.as_ref().to_path_buf());
         self
+    }
+
+    pub fn follow_links(mut self, yes: bool) -> Self {
+        self.copier.follow_links = yes;
+        self
+    }
+
+    pub fn add<P: AsRef<Path>>(mut self, src: P) -> Result<Self> {
+        let src = src.as_ref();
+        let src = if src.is_relative() {
+            if let Some(ref cwd) = self.cwd {
+                cwd.join(src)
+            } else {
+                std::env::current_dir()?.join(src)
+            }
+        } else {
+            src.to_path_buf()
+        };
+        for src in glob::glob(&format!("{}", src.display()))?.flatten() {
+            ensure!(
+                src.exists(),
+                "source file {} does not exist",
+                src.display()
+            );
+            self.copier.src.push(src);
+        }
+        Ok(self)
     }
 
     pub fn ipat<P: AsRef<str>>(mut self, pat: P) -> Self {
