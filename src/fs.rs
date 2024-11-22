@@ -3,7 +3,10 @@ use std::path::{Component, Path, PathBuf};
 use anyhow::{ensure, Context};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
-use crate::Result;
+use crate::{
+    path::{canonicalize, simplified},
+    Result,
+};
 
 pub fn ls<'a, P: AsRef<Path> + 'a, T: IntoIterator<Item = &'a P>>(
     dirs: T,
@@ -64,7 +67,7 @@ pub fn mkdir<'a, P: AsRef<Path> + 'a, T: IntoIterator<Item = &'a P>>(
 pub fn abs<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
     let path = path.as_ref();
     if path.exists() {
-        return Ok(dunce::canonicalize(path)?);
+        return Ok(canonicalize(path)?);
     }
     let path = if path.is_relative() {
         std::env::current_dir()?.join(path)
@@ -217,7 +220,7 @@ impl CopierBuilder {
         } else {
             src.to_path_buf()
         };
-        let src = dunce::simplified(&src);
+        let src = simplified(&src);
         for src in glob::glob(&format!("{}", src.display()))?.flatten() {
             ensure!(
                 src.exists(),
