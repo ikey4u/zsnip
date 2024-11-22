@@ -217,6 +217,7 @@ impl CopierBuilder {
         } else {
             src.to_path_buf()
         };
+        let src = dunce::simplified(&src);
         for src in glob::glob(&format!("{}", src.display()))?.flatten() {
             ensure!(
                 src.exists(),
