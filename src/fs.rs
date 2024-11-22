@@ -13,7 +13,7 @@ pub fn ls<'a, P: AsRef<Path> + 'a, T: IntoIterator<Item = &'a P>>(
 ) -> Result<Vec<String>> {
     let mut entries = vec![];
     for entry in dirs {
-        let entry = entry.as_ref();
+        let entry = simplified(entry.as_ref());
         ensure!(
             entry.exists(),
             "ls item `{}` does not exist",
@@ -23,7 +23,8 @@ pub fn ls<'a, P: AsRef<Path> + 'a, T: IntoIterator<Item = &'a P>>(
             entries.push(format!("{}", entry.display()));
         } else {
             for entry in entry.read_dir()?.flatten() {
-                entries.push(entry.path().to_string_lossy().to_string());
+                let path = entry.path();
+                entries.push(simplified(&path).to_string_lossy().to_string());
             }
         }
     }
