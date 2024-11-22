@@ -2,6 +2,13 @@
 name = "zsnip"
 version = "0.2.0"
 edition = "2021"
+authors = ["ikey4u <pwnkeeper@gmail.com>"]
+description = "A library that contains frequently used rust code snippets"
+homepage = "https://github.com/ikey4u/zsnip"
+documentation = "https://docs.rs/zsnip/latest"
+repository = "https://github.com/ikey4u/zsnip"
+license = "MIT"
+readme = "README.md"
 publish = ["crates-io"]
 
 [dependencies]
