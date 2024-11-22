@@ -107,9 +107,12 @@ impl CmdBuilder {
         Ok(CmdBuilder {
             cmd: Cmd {
                 argv,
-                cwd: current_dir().context(format!(
-                    "Get current working directory for running command: {cmdstr}"
-                ))?,
+                cwd: {
+                    let curdir = current_dir().context(format!(
+                        "Get current working directory for running command: {cmdstr}"
+                    ))?;
+                    dunce::simplified(&curdir).to_path_buf()
+                },
                 stream: false,
                 envs: HashMap::new(),
             },
@@ -117,7 +120,7 @@ impl CmdBuilder {
     }
 
     pub fn cwd<P: AsRef<Path>>(mut self, path: P) -> Self {
-        self.cmd.cwd = path.as_ref().to_path_buf();
+        self.cmd.cwd = dunce::simplified(path.as_ref()).to_path_buf();
         self
     }
 
